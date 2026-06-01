@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------- Estilos base globales ---------- */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: #000000;
+  color: #e8e8e8;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* La navegación es por zoom (rueda del ratón), no por scroll de página */
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Scrollbar oscuro ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a35;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a4a;
+}
+
+/* ---------- Utilidades reutilizables ---------- */
+@layer components {
+  /* Término del glosario: subrayado punteado amarillo */
+  .glossary-term {
+    @apply cursor-help underline decoration-dotted decoration-glossary underline-offset-4;
+    text-decoration-color: #fbbf24;
+  }
+
+  /* Marco estándar de una simulación interactiva */
+  .sim-frame {
+    @apply rounded-xl bg-simbg p-4;
+    border: 1px solid var(--section-accent, #2a2a35);
+  }
+
+  /* Botón base de las simulaciones */
+  .sim-btn {
+    @apply rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200;
+    @apply bg-white/5 text-text-primary hover:bg-white/15 border border-white/10;
+  }
+  .sim-btn--active {
+    @apply bg-white/20 border-white/30;
+  }
+
+  /* Etiqueta pequeña de control */
+  .sim-label {
+    @apply text-xs uppercase tracking-widest text-text-secondary;
+  }
+}
+
+/* Slider de rango con apariencia consistente en navegadores */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #60a5fa;
+  cursor: pointer;
+}
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  border: 2px solid #60a5fa;
+  cursor: pointer;
+}
+
+/* Animación de pulso para la flecha del hero */
+@keyframes float-down {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(10px);
+    opacity: 1;
+  }
+}
+.animate-float-down {
+  animation: float-down 1.8s ease-in-out infinite;
+}
+
+/* Mensaje de viewport pequeño */
+.small-viewport-warning {
+  display: none;
+}
+@media (max-width: 900px) {
+  .small-viewport-warning {
+    display: flex;
+  }
+  .main-experience {
+    display: none;
+  }
+}
