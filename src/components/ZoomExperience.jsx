@@ -2,137 +2,154 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { sections } from '../data/content.js'
 import ZoomBackground from './ZoomBackground.jsx'
-import Navbar from './ui/Navbar.jsx'
-import ZoomIndicator from './ui/ZoomIndicator.jsx'
+import ScaleRuler from './ui/ScaleRuler.jsx'
 import Hero from './ui/Hero.jsx'
 import StationPanel from './ui/StationPanel.jsx'
+import ExperimentModal from './ui/ExperimentModal.jsx'
+import InfoCard from './ui/InfoCard.jsx'
 
-// Orquestador del viaje por zoom. La rueda del ratón controla un valor `z` (0→1) que
-// recorre las escalas (cosmos→quark). Al alcanzar una sección, el viaje se "ancla":
-// se abre su panel con scroll interno; al llegar a su borde, el zoom continúa.
+// ─── Experiment registry ────────────────────────────────────────────────────
+// Each entry maps a click-target ID to a sim component (lazy) + metadata.
+const EXPERIMENTS = {
+  // Cosmología
+  'cosmos-expansion':   { title: 'Expansión del universo',          hint: 'Mueve el tiempo desde el Big Bang hasta el futuro lejano.', accent: '#5b7cff', Sim: lazy(() => import('./cosmos/UniverseExpansion.jsx'))  },
+  'cosmos-cmb':         { title: 'Fondo Cósmico de Microondas',     hint: 'La foto más antigua del cosmos. Pasa el ratón por las regiones.', accent: '#5b7cff', Sim: lazy(() => import('./cosmos/CMBMap.jsx'))           },
+  'cosmos-dark-matter': { title: 'Materia oscura',                  hint: 'Compara la rotación galáctica con y sin masa invisible.', accent: '#5b7cff', Sim: lazy(() => import('./cosmos/DarkMatterSim.jsx'))        },
+  'cosmos-timeline':    { title: 'Línea de tiempo cósmica',         hint: 'Recorre 13 800 Ma de historia (y el futuro) a escala log.', accent: '#5b7cff', Sim: lazy(() => import('./cosmos/CosmicTimeline.jsx'))       },
+  // Relatividad
+  'rel-spacetime':      { title: 'Curvatura del espacio-tiempo',    hint: 'Arrastra la masa, lanza un fotón hacia el agujero negro.', accent: '#ff9d3d', Sim: lazy(() => import('./relativity/SpacetimeMesh.jsx'))    },
+  'rel-twin':           { title: 'Paradoja de los gemelos',         hint: 'Cuanto más rápido viaja la nave, más lento avanza su reloj.', accent: '#ff9d3d', Sim: lazy(() => import('./relativity/TwinParadox.jsx'))      },
+  'rel-contraction':    { title: 'Contracción de longitud',         hint: 'Los objetos rápidos se comprimen en la dirección del viaje.', accent: '#ff9d3d', Sim: lazy(() => import('./relativity/LengthContraction.jsx')) },
+  'rel-lightspeed':     { title: 'El límite de velocidad (c)',      hint: 'Arrastra el punto y observa la energía necesaria para acercarse a c.', accent: '#ff9d3d', Sim: lazy(() => import('./relativity/LightSpeedLimit.jsx'))  },
+  // Cuántica
+  'qm-doubleslit':      { title: 'Experimento de la doble rendija', hint: 'Activa el detector y observa cómo colapsa la interferencia.', accent: '#36e08a', Sim: lazy(() => import('./quantum/DoubleSlit.jsx'))          },
+  'qm-uncertainty':     { title: 'Principio de incertidumbre',      hint: 'Comprime el paquete de onda y observa el impacto en el momento.', accent: '#36e08a', Sim: lazy(() => import('./quantum/UncertaintyPrinciple.jsx')) },
+  'qm-schrodinger':     { title: 'Gato de Schrödinger',             hint: 'Superposición cuántica: hasta que se observa, todo es posible.', accent: '#36e08a', Sim: lazy(() => import('./quantum/SchrodingerCat.jsx'))      },
+  'qm-tunnel':          { title: 'Efecto túnel cuántico',           hint: 'Las partículas atraviesan barreras clásicamente infranqueables.', accent: '#36e08a', Sim: lazy(() => import('./quantum/QuantumTunnel.jsx'))        },
+  // Modelo Estándar
+  'sm-quarks':          { title: 'Compositor de quarks',            hint: 'Combina quarks para construir protones, neutrones y más.', accent: '#ff4d8d', Sim: lazy(() => import('./standard-model/QuarkComposer.jsx'))  },
+  'sm-particles':       { title: 'Tabla de partículas',             hint: 'El catálogo completo de partículas elementales conocidas.', accent: '#ff4d8d', Sim: lazy(() => import('./standard-model/ParticleTable.jsx'))   },
+  'sm-forces':          { title: 'Las cuatro fuerzas fundamentales',hint: 'Alcance e intensidad de gravedad, EM, fuerte y débil.', accent: '#ff4d8d', Sim: lazy(() => import('./standard-model/ForcesComparison.jsx')) },
+}
 
-// Carga diferida de cada sección (code-splitting) + funciones para precargarlas.
-const IMPORTS = [
-  () => import('./cosmos/CosmologySection.jsx'),
-  () => import('./relativity/RelativitySection.jsx'),
-  () => import('./quantum/QuantumSection.jsx'),
-  () => import('./standard-model/StandardModelSection.jsx'),
-]
-const LAZY = IMPORTS.map((f) => lazy(f))
-
-// Posición de cada estación en el eje de zoom (0=universo, 1=quark).
-const ANCHORS = sections.map((_, i) => 0.14 + i * 0.24)
-const DOCK_R = 0.05 // radio para anclar a una estación
-const PREVIEW_R = 0.13 // radio en que el panel se previsualiza (crece/aparece)
-const FADE_R = 0.11 // radio de desvanecimiento
-const SCALE_K = 7 // intensidad del efecto de escala al acercarse/pasar
-const TRAVEL_SPEED = 0.00085 // sensibilidad de la rueda en modo viaje
-const HERO_VISIBLE = 0.12
-const HERO_FADE = 0.09
+// ─── Navigation constants ───────────────────────────────────────────────────
+const ANCHORS       = sections.map((_, i) => 0.14 + i * 0.24)
+const DOCK_R        = 0.05
+const PREVIEW_R     = 0.13
+const FADE_R        = 0.11
+const SCALE_K       = 7
+const TRAVEL_SPEED  = 0.00085
+const HERO_VISIBLE  = 0.12
+const HERO_FADE     = 0.09
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v))
 
-function PanelLoader() {
+// ─── Station HUD (minimal nav + hint) ──────────────────────────────────────
+function StationHUD({ section, index, total, onPrev, onNext }) {
   return (
-    <div className="flex h-[50vh] items-center justify-center">
-      <div className="flex flex-col items-center gap-3 text-text-secondary">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-accent" />
-        <span className="text-sm">Cargando sección…</span>
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex flex-col items-center gap-2 pb-6">
+      {/* Scale range chip */}
+      <div
+        className="rounded-full border px-3 py-1 text-xs font-mono"
+        style={{ borderColor: section.accent + '50', color: section.accent, background: section.color + 'cc' }}
+      >
+        {section.scaleRange}
       </div>
-    </div>
-  )
-}
 
-function Hint() {
-  return (
-    <div className="pointer-events-none fixed bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/60 px-5 py-2.5 text-sm text-text-secondary backdrop-blur">
-      🖱️ Usa la <span className="text-text-primary">rueda del ratón</span> para viajar por las escalas
+      {/* Navigation bar */}
+      <div
+        className="pointer-events-auto flex items-center gap-1 rounded-full border bg-black/70 px-2 py-1.5 backdrop-blur-md"
+        style={{ borderColor: section.accent + '35' }}
+      >
+        <button
+          onClick={onPrev}
+          className="rounded-full px-3 py-1 text-xs text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          ⌃ {index === 0 ? 'Inicio' : 'Anterior'}
+        </button>
+        <span
+          className="px-3 text-xs font-semibold"
+          style={{ color: section.accent }}
+        >
+          {section.title}
+        </span>
+        <button
+          onClick={onNext}
+          disabled={index === total - 1}
+          className="rounded-full px-3 py-1 text-xs font-medium text-white/50 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30"
+          style={index < total - 1 ? { color: section.accent } : {}}
+        >
+          {index === total - 1 ? 'Final del viaje' : 'Siguiente ⌄'}
+        </button>
+      </div>
+
+      {/* Interaction hint */}
+      <p className="text-[0.6rem] uppercase tracking-widest text-white/25">
+        Haz clic en los objetos para explorar · rueda del ratón para continuar
+      </p>
     </div>
   )
 }
 
 export default function ZoomExperience() {
-  const zoomRef = useRef(0)
-  const dockedRef = useRef(null)
-  const animatingRef = useRef(false)
-  const cardRefs = useRef([])
-  const heroRef = useRef(null)
+  const zoomRef       = useRef(0)
+  const dockedRef     = useRef(null)
+  const animatingRef  = useRef(false)
+  const cardRefs      = useRef([])
+  const heroRef       = useRef(null)
 
-  const [docked, setDocked] = useState(null)
-  const [mounted, setMounted] = useState([])
-  const [hintVisible, setHintVisible] = useState(true)
+  const [docked,       setDocked]       = useState(null)
+  const [hintVisible,  setHintVisible]  = useState(true)
+  const [activeCard,   setActiveCard]   = useState(null)  // { kind:'experiment'|'info', ...data }
 
-  const registerRef = useCallback((i, el) => {
-    cardRefs.current[i] = el
-  }, [])
+  const registerRef = useCallback((i, el) => { cardRefs.current[i] = el }, [])
 
-  const ensureMounted = useCallback((i) => {
-    setMounted((prev) => (prev.includes(i) ? prev : [...prev, i]))
-  }, [])
-
-  // Actualiza escala/opacidad/visibilidad del héroe y de cada panel según el zoom.
   const applyVisuals = useCallback(() => {
-    const z = zoomRef.current
+    const z  = zoomRef.current
     const dk = dockedRef.current
 
     if (heroRef.current) {
       const show = dk === null && z < HERO_VISIBLE
-      heroRef.current.style.display = show ? 'block' : 'none'
-      heroRef.current.style.opacity = clamp(1 - z / HERO_FADE, 0, 1)
+      heroRef.current.style.display   = show ? 'block' : 'none'
+      heroRef.current.style.opacity   = clamp(1 - z / HERO_FADE, 0, 1)
       heroRef.current.style.transform = `scale(${Math.pow(2, z * SCALE_K)})`
     }
 
+    // Station panels are now invisible placeholders – just toggle display
     ANCHORS.forEach((a, i) => {
       const el = cardRefs.current[i]
       if (!el) return
       const isDocked = dk === i
-      const delta = z - a
-      const near = Math.abs(delta) < PREVIEW_R
-      if (!isDocked && !near) {
-        el.style.display = 'none'
-        return
-      }
-      el.style.display = 'block'
-      el.style.transform = `scale(${isDocked ? 1 : Math.pow(2, delta * SCALE_K)})`
-      el.style.opacity = isDocked ? 1 : clamp(1 - Math.abs(delta) / FADE_R, 0, 1)
-      el.style.pointerEvents = isDocked ? 'auto' : 'none'
-      el.style.overflowY = isDocked ? 'auto' : 'hidden'
+      const near     = Math.abs(z - a) < PREVIEW_R
+      el.style.display = (isDocked || near) ? 'block' : 'none'
     })
   }, [])
 
-  const dockTo = useCallback(
-    (idx) => {
-      ensureMounted(idx)
-      animatingRef.current = true
-      gsap.killTweensOf(zoomRef)
-      gsap.to(zoomRef, {
-        current: ANCHORS[idx],
-        duration: 0.5,
-        ease: 'power2.out',
-        onUpdate: applyVisuals,
-        onComplete: () => {
-          animatingRef.current = false
-          dockedRef.current = idx
-          setDocked(idx)
-          if (cardRefs.current[idx]) cardRefs.current[idx].scrollTop = 0
-          applyVisuals()
-        },
-      })
-    },
-    [applyVisuals, ensureMounted]
-  )
+  const dockTo = useCallback((idx) => {
+    animatingRef.current = true
+    gsap.killTweensOf(zoomRef)
+    gsap.to(zoomRef, {
+      current: ANCHORS[idx],
+      duration: 0.5,
+      ease: 'power2.out',
+      onUpdate: applyVisuals,
+      onComplete: () => {
+        animatingRef.current = false
+        dockedRef.current = idx
+        setDocked(idx)
+        applyVisuals()
+      },
+    })
+  }, [applyVisuals])
 
-  const undock = useCallback(
-    (dir) => {
-      const i = dockedRef.current
-      if (i === null) return
-      dockedRef.current = null
-      setDocked(null)
-      zoomRef.current = clamp(ANCHORS[i] + dir * (DOCK_R + 0.02), 0, 1)
-      applyVisuals()
-    },
-    [applyVisuals]
-  )
+  const undock = useCallback((dir) => {
+    const i = dockedRef.current
+    if (i === null) return
+    dockedRef.current = null
+    setDocked(null)
+    zoomRef.current = clamp(ANCHORS[i] + dir * (DOCK_R + 0.02), 0, 1)
+    applyVisuals()
+  }, [applyVisuals])
 
   const goHome = useCallback(() => {
     dockedRef.current = null
@@ -144,166 +161,156 @@ export default function ZoomExperience() {
       duration: 0.9,
       ease: 'power2.inOut',
       onUpdate: applyVisuals,
-      onComplete: () => {
-        animatingRef.current = false
-        applyVisuals()
-      },
+      onComplete: () => { animatingRef.current = false; applyVisuals() },
     })
   }, [applyVisuals])
 
-  const goToStation = useCallback(
-    (idx) => {
-      if (idx < 0) return goHome()
-      if (idx > ANCHORS.length - 1) return
-      ensureMounted(idx)
-      setHintVisible(false)
-      dockedRef.current = null
-      setDocked(null)
-      animatingRef.current = true
-      gsap.killTweensOf(zoomRef)
-      gsap.to(zoomRef, {
-        current: ANCHORS[idx],
-        duration: 0.9,
-        ease: 'power2.inOut',
-        onUpdate: applyVisuals,
-        onComplete: () => {
-          animatingRef.current = false
-          dockedRef.current = idx
-          setDocked(idx)
-          if (cardRefs.current[idx]) cardRefs.current[idx].scrollTop = 0
-          applyVisuals()
-        },
-      })
-    },
-    [applyVisuals, ensureMounted, goHome]
-  )
+  const goToStation = useCallback((idx) => {
+    if (idx < 0) return goHome()
+    if (idx > ANCHORS.length - 1) return
+    setHintVisible(false)
+    dockedRef.current = null
+    setDocked(null)
+    animatingRef.current = true
+    gsap.killTweensOf(zoomRef)
+    gsap.to(zoomRef, {
+      current: ANCHORS[idx],
+      duration: 0.9,
+      ease: 'power2.inOut',
+      onUpdate: applyVisuals,
+      onComplete: () => {
+        animatingRef.current = false
+        dockedRef.current = idx
+        setDocked(idx)
+        applyVisuals()
+      },
+    })
+  }, [applyVisuals, goHome])
 
   const nearestIndex = useCallback(() => {
     const z = zoomRef.current
     if (z < 0.07) return -1
-    let best = 0
-    let bestD = Infinity
-    ANCHORS.forEach((a, i) => {
-      const d = Math.abs(z - a)
-      if (d < bestD) {
-        bestD = d
-        best = i
-      }
-    })
+    let best = 0, bestD = Infinity
+    ANCHORS.forEach((a, i) => { const d = Math.abs(z - a); if (d < bestD) { bestD = d; best = i } })
     return best
   }, [])
 
-  const onWheel = useCallback(
-    (e) => {
-      if (animatingRef.current) {
-        e.preventDefault()
-        return
-      }
-      setHintVisible(false)
-      const dk = dockedRef.current
+  const onWheel = useCallback((e) => {
+    if (animatingRef.current) { e.preventDefault(); return }
+    // Don't capture scroll if any card/modal is open
+    if (activeCard) return
+    setHintVisible(false)
+    const dk = dockedRef.current
 
-      if (dk !== null) {
-        // Anclado: la rueda desplaza el panel; al llegar a su borde, reanuda el zoom.
-        e.preventDefault()
-        const el = cardRefs.current[dk]
-        if (el) {
-          const atTop = el.scrollTop <= 0
-          const atBottom = Math.ceil(el.scrollTop + el.clientHeight) >= el.scrollHeight - 1
-          const down = e.deltaY > 0
-          if ((down && !atBottom) || (!down && !atTop)) {
-            el.scrollTop += e.deltaY
-            return
-          }
-        }
-        undock(e.deltaY > 0 ? 1 : -1)
-        return
-      }
-
-      // Modo viaje: la rueda mueve el zoom de forma continua
+    if (dk !== null) {
       e.preventDefault()
-      const prev = zoomRef.current
-      const nz = clamp(prev + e.deltaY * TRAVEL_SPEED, 0, 1)
-      zoomRef.current = nz
-      ANCHORS.forEach((a, i) => {
-        if (Math.abs(nz - a) < PREVIEW_R) ensureMounted(i)
-      })
-      applyVisuals()
-      // Ancla a la primera estación encontrada en el trayecto (robusto a saltos grandes).
-      const reached = ANCHORS.map((a, i) => ({ a, i }))
-        .filter(({ a }) => a >= Math.min(prev, nz) - DOCK_R && a <= Math.max(prev, nz) + DOCK_R)
-        .sort((x, y) => (nz >= prev ? x.a - y.a : y.a - x.a))
-      if (reached.length) dockTo(reached[0].i)
-    },
-    [applyVisuals, dockTo, ensureMounted, undock]
-  )
+      // Station panels are now empty – immediately undock on any scroll
+      undock(e.deltaY > 0 ? 1 : -1)
+      return
+    }
 
-  const onKey = useCallback(
-    (e) => {
-      const dk = dockedRef.current
-      const current = dk !== null ? dk : nearestIndex()
-      if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
-        e.preventDefault()
-        setHintVisible(false)
-        goToStation(current + 1)
-      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-        e.preventDefault()
-        goToStation(current - 1)
-      } else if (e.key === 'Home') {
-        goHome()
-      } else if (e.key === 'End') {
-        goToStation(ANCHORS.length - 1)
-      }
-    },
-    [goHome, goToStation, nearestIndex]
-  )
+    e.preventDefault()
+    const prev = zoomRef.current
+    const nz = clamp(prev + e.deltaY * TRAVEL_SPEED, 0, 1)
+    zoomRef.current = nz
+    applyVisuals()
+    const reached = ANCHORS.map((a, i) => ({ a, i }))
+      .filter(({ a }) => a >= Math.min(prev, nz) - DOCK_R && a <= Math.max(prev, nz) + DOCK_R)
+      .sort((x, y) => (nz >= prev ? x.a - y.a : y.a - x.a))
+    if (reached.length) dockTo(reached[0].i)
+  }, [applyVisuals, dockTo, undock, activeCard])
 
-  // Listeners globales + precarga de las secciones en tiempo libre.
+  const onKey = useCallback((e) => {
+    if (activeCard) return
+    const dk = dockedRef.current
+    const current = dk !== null ? dk : nearestIndex()
+    if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
+      e.preventDefault(); setHintVisible(false); goToStation(current + 1)
+    } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
+      e.preventDefault(); goToStation(current - 1)
+    } else if (e.key === 'Home') { goHome() }
+    else if (e.key === 'End')  { goToStation(ANCHORS.length - 1) }
+  }, [goHome, goToStation, nearestIndex, activeCard])
+
+  // ── Object click → open info card or experiment modal ─────────────────────
+  const handleObjectClick = useCallback((config) => {
+    if (config.type === 'experiment') {
+      const exp = EXPERIMENTS[config.expId]
+      if (exp) setActiveCard({ kind: 'experiment', ...exp })
+    } else if (config.type === 'info') {
+      setActiveCard({ kind: 'info', ...config })
+    }
+  }, [])
+
+  const closeCard = useCallback(() => setActiveCard(null), [])
+
+  const openExperimentFromInfo = useCallback((expId) => {
+    setActiveCard(null)
+    // tiny delay lets the close animation finish before the modal opens
+    setTimeout(() => {
+      const exp = EXPERIMENTS[expId]
+      if (exp) setActiveCard({ kind: 'experiment', ...exp })
+    }, 80)
+  }, [])
+
   useEffect(() => {
     window.addEventListener('wheel', onWheel, { passive: false })
     window.addEventListener('keydown', onKey)
     applyVisuals()
-    const preload = () => IMPORTS.forEach((f) => f())
-    const idle = typeof window.requestIdleCallback === 'function'
-    const id = idle ? window.requestIdleCallback(preload) : window.setTimeout(preload, 1500)
     return () => {
       window.removeEventListener('wheel', onWheel)
       window.removeEventListener('keydown', onKey)
-      if (idle && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(id)
-      else clearTimeout(id)
     }
   }, [onWheel, onKey, applyVisuals])
 
-  // Re-aplica los estilos cuando cambian el anclaje o los paneles montados.
-  useEffect(() => {
-    applyVisuals()
-  }, [docked, mounted, applyVisuals])
+  useEffect(() => { applyVisuals() }, [docked, applyVisuals])
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <ZoomBackground zoomRef={zoomRef} />
-      <Navbar onNavigate={goToStation} onHome={goHome} zoomRef={zoomRef} />
-      <ZoomIndicator zoomRef={zoomRef} anchors={ANCHORS} sections={sections} onJump={goToStation} />
+      <ZoomBackground
+        zoomRef={zoomRef}
+        docked={docked}
+        onObjectClick={handleObjectClick}
+      />
+
+      {/* Navbar with scale ruler */}
+      <ScaleRuler zoomRef={zoomRef} anchors={ANCHORS} sections={sections} onJump={goToStation} />
+
+      {/* Hero screen */}
       <Hero heroRef={heroRef} onStart={() => goToStation(0)} />
 
-      {mounted.map((i) => {
-        const Comp = LAZY[i]
-        return (
-          <StationPanel
-            key={i}
-            section={sections[i]}
-            index={i}
-            total={ANCHORS.length}
-            registerRef={registerRef}
-            onGo={goToStation}
-          >
-            <Suspense fallback={<PanelLoader />}>
-              <Comp />
-            </Suspense>
-          </StationPanel>
-        )
-      })}
+      {/* Invisible station ref placeholders (for undocking detection) */}
+      {sections.map((_, i) => (
+        <StationPanel key={i} index={i} registerRef={registerRef} />
+      ))}
 
-      {hintVisible && <Hint />}
+      {/* Station HUD: minimal nav + hint when docked */}
+      {docked !== null && (
+        <StationHUD
+          section={sections[docked]}
+          index={docked}
+          total={sections.length}
+          onPrev={() => goToStation(docked - 1)}
+          onNext={() => goToStation(docked + 1)}
+        />
+      )}
+
+      {/* Scroll hint for first-time visitors */}
+      {hintVisible && (
+        <div className="pointer-events-none fixed bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/60 px-5 py-2.5 text-sm text-white/50 backdrop-blur">
+          Usa la <span className="text-white">rueda del ratón</span> para viajar por las escalas
+        </div>
+      )}
+
+      {/* Info card (lightweight facts + optional "go deeper" button) */}
+      {activeCard?.kind === 'info' && (
+        <InfoCard card={activeCard} onClose={closeCard} onOpenExperiment={openExperimentFromInfo} />
+      )}
+
+      {/* Experiment modal (full sim) */}
+      {activeCard?.kind === 'experiment' && (
+        <ExperimentModal experiment={activeCard} onClose={closeCard} />
+      )}
     </div>
   )
 }
