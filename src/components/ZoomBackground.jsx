@@ -122,7 +122,7 @@ const LAYERS = [
 
 const STATION_SCENES = [CosmosStation, RelativityStation, QuantumStation, StandardStation]
 
-function ZoomWorld({ zoomRef, docked, onObjectClick }) {
+function ZoomWorld({ zoomRef, docked, onObjectClick, maxZ }) {
   const texture = useMemo(() => makeDotTexture(), [])
   const farStars = useMemo(() => generatePositions('sphere', 1200, 30), [])
   const farRef = useRef()
@@ -144,7 +144,14 @@ function ZoomWorld({ zoomRef, docked, onObjectClick }) {
       </points>
 
       {LAYERS.map((layer, i) => (
-        <PointLayer key={i} texture={texture} zoomRef={zoomRef} {...layer} />
+        <PointLayer
+          key={i}
+          texture={texture}
+          zoomRef={zoomRef}
+          {...layer}
+          center={layer.center * maxZ}
+          sigma={(layer.sigma ?? 0.15) * maxZ}
+        />
       ))}
 
       {/* Interactive 3D objects for the current station */}
@@ -157,7 +164,7 @@ function ZoomWorld({ zoomRef, docked, onObjectClick }) {
   )
 }
 
-export default function ZoomBackground({ zoomRef, docked, onObjectClick }) {
+export default function ZoomBackground({ zoomRef, docked, onObjectClick, maxZ = 1 }) {
   return (
     <div
       className="fixed inset-0 z-0"
@@ -171,7 +178,7 @@ export default function ZoomBackground({ zoomRef, docked, onObjectClick }) {
       >
         <color attach="background" args={['#000007']} />
         <fog attach="fog" args={['#000007', 14, 30]} />
-        <ZoomWorld zoomRef={zoomRef} docked={docked} onObjectClick={onObjectClick} />
+        <ZoomWorld zoomRef={zoomRef} docked={docked} onObjectClick={onObjectClick} maxZ={maxZ} />
       </Canvas>
       </WebGLBoundary>
     </div>

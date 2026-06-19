@@ -381,7 +381,7 @@ const STOPS = [
 
 const STRIP_ITEM_H = 52  // px per stop in the strip
 
-export default function ScaleRuler({ zoomRef, anchors, sections, onJump }) {
+export default function ScaleRuler({ zoomRef, anchors, sections, onJump, maxZ = 1 }) {
   const expTextRef   = useRef(null)
   const stripRef     = useRef(null)
   const featIconRef  = useRef(null)
@@ -394,19 +394,21 @@ export default function ScaleRuler({ zoomRef, anchors, sections, onJump }) {
   useEffect(() => {
     let raf
     const loop = () => {
-      const z = zoomRef.current
-      if (Math.abs(z - lastZ.current) > 0.0008) {
-        lastZ.current = z
+      // f is the 0..1 fraction of the (possibly stretched) journey; STOPS
+      // and their distance thresholds are all defined in this fraction space.
+      const f = zoomRef.current / maxZ
+      if (Math.abs(f - lastZ.current) > 0.0008) {
+        lastZ.current = f
 
         // Update scale text
-        const exp = Math.round(26 - z * 44)
+        const exp = Math.round(26 - f * 44)
         if (expTextRef.current) expTextRef.current.textContent = `10${sup(exp)} m`
 
         // Find nearest stop
         let nearest = 0
         let nearestDist = Infinity
         STOPS.forEach((s, i) => {
-          const d = Math.abs(z - s.z)
+          const d = Math.abs(f - s.z)
           if (d < nearestDist) { nearestDist = d; nearest = i }
         })
         const stop = STOPS[nearest]
@@ -438,7 +440,7 @@ export default function ScaleRuler({ zoomRef, anchors, sections, onJump }) {
         // Update strip item highlights imperatively
         const items = stripRef.current?.querySelectorAll('[data-stop]')
         items?.forEach((el, i) => {
-          const dist = Math.abs(z - STOPS[i].z)
+          const dist = Math.abs(f - STOPS[i].z)
           const alpha = Math.max(0, 1 - dist / 0.15)
           el.style.opacity = 0.35 + alpha * 0.65
           el.style.transform = `scale(${1 + alpha * 0.08})`
@@ -505,12 +507,13 @@ export default function ScaleRuler({ zoomRef, anchors, sections, onJump }) {
               data-stop={i}
               onClick={() => {
                 /* jump to nearest section anchor */
+                const stopZ = stop.z * maxZ
                 let best = -1, bestDist = Infinity
                 anchors.forEach((a, j) => {
-                  const d = Math.abs(stop.z - a)
+                  const d = Math.abs(stopZ - a)
                   if (d < bestDist) { bestDist = d; best = j }
                 })
-                if (bestDist < 0.18 && best >= 0) onJump(best)
+                if (bestDist < 0.18 * maxZ && best >= 0) onJump(best)
               }}
               className="pointer-events-auto flex w-full items-center gap-2 px-2 py-1.5 transition-all duration-150"
               style={{ height: STRIP_ITEM_H, opacity: i === 0 ? 1 : 0.35 }}
