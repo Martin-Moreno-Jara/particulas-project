@@ -118,10 +118,21 @@ export default function QuarkComposer() {
       {/* Resultado */}
       <div className="mt-4 min-h-[4.5rem] rounded-lg border border-white/10 bg-black/40 p-4">
         {!complete ? (
-          <p className="text-sm text-text-secondary">
-            Añade {3 - slots.length} quark{3 - slots.length !== 1 ? 's' : ''} más. Un hadrón necesita
-            tres quarks, uno de cada carga de color (rojo, verde y azul), para ser "blanco".
-          </p>
+          <div className="text-sm text-text-secondary">
+            <p>
+              Añade {3 - slots.length} quark{3 - slots.length !== 1 ? 's' : ''} más. Un hadrón necesita
+              tres quarks, uno de cada carga de color (rojo, verde y azul), para ser "blanco".
+            </p>
+            <p className="mt-2 text-xs leading-relaxed">
+              Un quark es una partícula elemental: no está hecha de nada más pequeño, y nunca se
+              observa sola en la naturaleza, solo combinada con otros quarks (confinamiento de
+              color). Existen seis "sabores" — up, down, charm, strange, top y bottom — agrupados
+              en pares de masa creciente. Su carga eléctrica es siempre una fracción de la del
+              electrón: +2/3 o −1/3. Los quarks up y down, los más ligeros y estables, son los
+              que componen toda la materia ordinaria que nos rodea: dos up y un down forman un
+              protón, y un up y dos down forman un neutrón.
+            </p>
+          </div>
         ) : match ? (
           <div>
             <div className="flex items-center gap-3">

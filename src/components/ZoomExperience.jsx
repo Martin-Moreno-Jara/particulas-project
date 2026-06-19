@@ -449,6 +449,7 @@ export default function ZoomExperience() {
         docked={docked}
         onObjectClick={handleObjectClick}
         maxZ={MAX_Z}
+        anchors={ANCHORS}
       />
 
       {/* Navbar with scale ruler */}
