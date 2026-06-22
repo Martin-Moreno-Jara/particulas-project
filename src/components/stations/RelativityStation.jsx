@@ -175,8 +175,7 @@ export default function RelativityStation({ onObjectClick }) {
             'Los satélites GPS aplican corrección relativista; sin ella, los errores de posición acumularían varios kilómetros por día.',
           ],
           'rel-twin',
-          // MinutePhysics – "Einstein's Proof of E=mc²" / "Special Relativity" series
-          { id: 'hW7DW9NIO9M', title: 'MinutePhysics — Por qué E = mc²' },
+          { id: 'rB8nyNqaVRA', title: 'Paradoja de los gemelos' },
         ))}
       >
         <TwinClocks />

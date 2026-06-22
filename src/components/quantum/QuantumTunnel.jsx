@@ -152,8 +152,22 @@ export default function QuantumTunnel() {
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-text-secondary">
+        En física clásica, una partícula sin suficiente energía para superar una barrera de
+        potencial simplemente rebota: nunca aparece al otro lado. En mecánica cuántica, la
+        partícula se describe como una función de onda extendida en el espacio, y dentro de la
+        barrera esa onda no se anula, sino que decae exponencialmente con el grosor y la altura
+        del obstáculo. Como la onda nunca llega exactamente a cero, existe una probabilidad —
+        pequeña pero real — de que la partícula "aparezca" del otro lado sin haber adquirido la
+        energía necesaria para cruzarla clásicamente: eso es el efecto túnel. Cuanto más alta o
+        más ancha es la barrera, más rápido decae la onda en su interior y menor es la
+        probabilidad de tunelaje, como puedes comprobar moviendo los controles de arriba.
+      </p>
+      <p className="mt-2 text-xs leading-relaxed text-text-secondary">
         En el Sol, la fusión nuclear ocurre porque los protones se "teletransportan" a través de la
         barrera electrostática gracias a este efecto: sin túnel cuántico, las estrellas no brillarían.
+        El mismo principio se usa en la vida cotidiana, por ejemplo en el microscopio de efecto
+        túnel (STM), capaz de "ver" átomos individuales midiendo la corriente que tunela entre una
+        punta metálica y una superficie.
       </p>
     </div>
   )

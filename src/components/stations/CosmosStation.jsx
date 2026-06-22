@@ -157,8 +157,7 @@ export default function CosmosStation({ onObjectClick }) {
             'Esas diminutas fluctuaciones de temperatura son las semillas gravitacionales de todas las galaxias actuales.',
           ],
           'cosmos-cmb',
-          // Powers of Ten (1977) — Charles & Ray Eames. La inspiración de este proyecto.
-          { id: '0fKBhvDjuy0', title: 'Powers of Ten — Charles & Ray Eames (1977)' },
+          { id: '-kE9dGVPPNQ', title: 'Fondo cósmico de microondas' },
         ))}
       >
         <CMBSphere />

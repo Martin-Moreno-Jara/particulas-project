@@ -170,8 +170,7 @@ export default function StandardModelStation({ onObjectClick }) {
             "La 'gran unificación' (GUT) aspira a describir las cuatro fuerzas como una sola — la gravedad aún no ha podido integrarse.",
           ],
           'sm-forces',
-          // Kurzgesagt – "The Four Fundamental Forces of Nature"
-          { id: 'r--RI6c1l-Q', title: 'Kurzgesagt — Las cuatro fuerzas fundamentales' },
+          { id: 'GJIRHzYOn1U', title: '4 fuerzas fundamentales' },
         ))}
       >
         <FourForces />

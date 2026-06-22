@@ -224,8 +224,7 @@ export default function QuantumStation({ onObjectClick }) {
             'Los electrones no siguen órbitas definidas, sino nubes de probabilidad — los orbitales describen dónde es probable encontrarlos.',
           ],
           'qm-uncertainty',
-          // TED-Ed – "How small are we in the scale of the universe?" / Veritasium doble rendija
-          { id: 'Iim0LII5tOg', title: 'Veritasium — El extraño experimento de la doble rendija' },
+          { id: 'JnEAMYltzi0', title: 'Teorema de incertidumbre' },
         ))}
       >
         <Atom />
